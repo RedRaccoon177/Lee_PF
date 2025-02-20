@@ -39,9 +39,17 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1386394348996212, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1441875363411674, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
       propertyPath: m_Name
       value: SM_Chr_BR_EVA_Suit_01
+      objectReference: {fileID: 0}
+    - target: {fileID: 1914329949261116, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4350046931891536, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
       propertyPath: m_LocalPosition.x
@@ -84,7 +92,11 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 1381914074786746, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
+    - {fileID: 1686250020581380, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
+    - {fileID: 1386394348996212, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
+    - {fileID: 1914329949261116, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 4461762327491480, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
       insertIndex: -1
