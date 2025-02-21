@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
@@ -14,26 +16,37 @@ public class PlayerController : MonoBehaviour
     AnimationManager _animationManager;     // 애니메이션을 관리하는 AnimationManager
     Rigidbody _rigidbody;      
     Transform _transform;
-    public bool _isPlaying = false;
+
 
     public LayerMask _targetLayer;
-    Vector3 _skillQRange = new Vector3(4f, 2f, 3f); // 박스 크기
-    Vector3 _skillQCenter = new Vector3(0f, 1.2f, 2f); // 박스 위치 오프셋
-    Quaternion _skillQRotation;
+    Vector3 _skillQRange = new Vector3(3f, 2f, 3f); // 박스 크기
+    Vector3 _skillQCenter = new Vector3(0f, 1.5f, 2f); // 박스 위치 오프셋
+    Vector3 _playerSkillQPosition;
 
     Ray _mouseTransform;
 
     Queue<ICommand> _commandHistory = new Queue<ICommand>(); // 실행한 명령을 저장하는 큐 ( REC용 )
     Stack<ICommand> _AvoidRedundantExecution = new Stack<ICommand>();   //중복 실행을 방지하는
-
+    
+    //스피드 관련 필드
     float _originalSpeed;   //원래 스피드
     float _rushSpeed;   //원래 스피드
 
-    /// <summary>
-    /// 오브젝트가 생성될 때 실행되는 초기화 함수.
-    /// 필요한 컴포넌트들을 가져온다.
-    /// </summary>
-    private void Awake()
+    bool _isSkillQ = false;
+
+    //커서 이미지
+    public Texture2D _attackCursor;
+    public Vector2 hotSpot = Vector2.zero; // 기준점
+
+    //A를 누르고 좌클릭 참/거짓 값
+    bool _isATrue = false;
+
+    public GameObject[] _iconArrows;
+
+    public bool _IsPlayerContactMoveIcon = false;
+    public bool _IsPlayerContactAttackIcon = false;
+
+    void Awake()
     {
         _animator = GetComponent<Animator>();
         _agent = GetComponent<NavMeshAgent>();  // NavMeshAgent 가져오기 (이동 처리)
@@ -50,28 +63,32 @@ public class PlayerController : MonoBehaviour
     void OnDrawGizmos()
     {
         Gizmos.color = Color.red;
-        Gizmos.matrix = Matrix4x4.TRS(transform.position + _skillQCenter, transform.rotation, _skillQRange);
+
+        // 기즈모가 그려질 위치 (플레이어 기준 항상 앞으로!)
+        Vector3 _playerSkillQPositionGizmo = transform.position
+                                + transform.right * _skillQCenter.x  // 좌우 이동
+                                + transform.up * _skillQCenter.y     // 높이 이동
+                                + transform.forward * _skillQCenter.z; // 항상 플레이어 앞을 기준
+
+        // 회전 적용 (항상 플레이어 회전 유지)
+        Gizmos.matrix = Matrix4x4.TRS(_playerSkillQPositionGizmo, transform.rotation, _skillQRange);
+
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
     }
-    /// <summary>
-    /// 게임 오브젝트가 활성화될 때 실행되는 함수.
-    /// 입력 시스템에 이벤트를 등록하여 플레이어 입력을 감지한다.
-    /// </summary>
-    private void OnEnable()
+    
+    void OnEnable()
     {
         _playerInput.actions["Move"].performed += OnMove;   // 이동 입력 등록
         
         _playerInput.actions["Stop"].performed += OnStop;   // 실행 취소 입력 등록
         
         _playerInput.actions["Rush"].performed += OnRush;   // 점프 입력 등록
+
+        _playerInput.actions["AttackMove"].performed += OnAtttackMove;
         
         _playerInput.actions["SkillQ"].performed += OnSkillQ; // 스킬 Q 입력 등록
     }
 
-    /// <summary>
-    /// 게임 오브젝트가 비활성화될 때 실행되는 함수.
-    /// 등록된 입력 이벤트를 제거하여 메모리 누수를 방지한다.
-    /// </summary>
     void OnDisable()
     {
         _playerInput.actions["Move"].performed -= OnMove;
@@ -83,33 +100,64 @@ public class PlayerController : MonoBehaviour
         _playerInput.actions["SkillQ"].performed -= OnSkillQ;
     }
 
-
-    /// <summary>
-    /// 마우스 클릭 시 해당 위치로 플레이어를 이동시키는 함수.
-    /// </summary>
-    /// <param name="ctx">입력 시스템에서 전달하는 CallbackContext (입력 정보 포함)</param>
     public void OnMove(InputAction.CallbackContext ctx)
     {
+        UnityEngine.Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
+
         // 마우스 클릭한 위치를 가져오기
         Ray ray = _camera.ScreenPointToRay(Mouse.current.position.ReadValue());
 
-        //  TODO: ▼ 만약 바닥이면 이동, 바닥이 아니라면 공격 진행
-        if (Physics.Raycast(ray, out RaycastHit hit))
+        int _layerMasks = LayerMask.GetMask("Ground");    //특정 레이어만 감지
+
+        if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, _layerMasks))
         {
-            // MoveCommand 객체를 생성하여 플레이어 이동 실행
-            ICommand moveCommand = new MoveCommand(_animator, _agent, _animationManager, hit.point, this, _originalSpeed);
+            GameObject clickedObject = hit.collider.gameObject; // 클릭한 오브젝트
+
+            if (hit.collider.gameObject.name == "Ground")
+            {
+                Debug.Log(hit.collider.gameObject.name);
+            }
+            //우클릭 이동
+            if (ctx.control.path == "/Mouse/rightButton")
+            {
+                _IsPlayerContactMoveIcon = false;
+                _IsPlayerContactAttackIcon = true;
+
+                _iconArrows[0].transform.position =
+                    new Vector3(hit.point.x, hit.point.y + 1, hit.point.z); // 기존 마커 이동
+
+                //그냥 이동
+            }
+            else if (ctx.control.path == "/Mouse/leftButton")
+            {
+                //무엇을 클릭하든간에 정보 확인
+            }
+            //좌클릭 + A => 공격
+            else if (ctx.control.path == "/Mouse/leftButton" && _isATrue == true)
+            {
+                _IsPlayerContactMoveIcon = true;
+                _IsPlayerContactAttackIcon = false;
+
+                _iconArrows[1].transform.position =
+                    new Vector3(hit.point.x, hit.point.y + 1, hit.point.z); // 기존 마커 이동
+
+                _isATrue = false;
+            }
+
+            ICommand moveCommand = new MoveCommand(_animator, _agent, _animationManager, hit.point, this, _originalSpeed, _isATrue);
             moveCommand.Execute(); // 이동 실행
-            
+
             _commandHistory.Enqueue(moveCommand); // 실행한 명령을 스택에 저장 (Undo 기능을 위해)
         }
+
+
     }
 
-    /// <summary>
-    /// 실행 취소 (Stop) 기능을 수행하는 함수.
-    /// </summary>
-    /// <param name="ctx">입력 시스템에서 전달하는 CallbackContext (입력 정보 포함)</param>
     public void OnStop(InputAction.CallbackContext ctx)
     {
+        _IsPlayerContactMoveIcon = true;
+        _IsPlayerContactAttackIcon = true;
+
         if (ctx.performed == true && _commandHistory.Count > 0) // 실행 취소할 명령이 있는지 확인
         {
             ICommand stopCommand = new StopCommand(_agent, _animationManager);
@@ -117,10 +165,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 가속 애니메이션을 실행하는 함수.
-    /// </summary>
-    /// <param name="ctx">입력 시스템에서 전달하는 CallbackContext (입력 정보 포함)</param>
     public void OnRush(InputAction.CallbackContext ctx)
     {
         ICommand rushCommand = new RushCommand(_agent, _animationManager, _originalSpeed, _rushSpeed);
@@ -129,31 +173,38 @@ public class PlayerController : MonoBehaviour
         _AvoidRedundantExecution.Push(rushCommand);
     }
 
-    /// <summary>
-    /// 스킬 Q를 사용하는 함수.
-    /// </summary>
-    /// <param name="ctx">입력 시스템에서 전달하는 CallbackContext (입력 정보 포함)</param>
+    public void OnAtttackMove(InputAction.CallbackContext ctx)
+    {
+        UnityEngine.Cursor.SetCursor(_attackCursor, hotSpot, CursorMode.Auto);
+        _isATrue = true;
+    }
+
     public void OnSkillQ(InputAction.CallbackContext ctx)
     {
+        if (_isSkillQ) return;
+        StartCoroutine(SkillQCoolTime());
+
+        _IsPlayerContactMoveIcon = true;
+        _IsPlayerContactAttackIcon = true;
+
         _mouseTransform = Camera.main.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
-
         if(Physics.Raycast(_mouseTransform, out hit))
         {
             transform.LookAt(hit.point);
-            _skillQRotation = transform.rotation;
-            _skillQCenter = transform.position + transform.forward;
         }
+        _playerSkillQPosition = transform.position + transform.right * _skillQCenter.x + transform.up * _skillQCenter.y + transform.forward * _skillQCenter.z;
 
-        ICommand skillQCommand = new SkillQCommand(_animationManager, _transform, _skillQRange, _skillQCenter, _targetLayer);
+        ICommand skillQCommand = new SkillQCommand(_animationManager, _transform, _skillQRange, _playerSkillQPosition, _targetLayer, _agent);
         skillQCommand.Execute();
     }
-
-
-    //TODO: 만약 Stack(_AvoidRedundantExecution)에 중복 되는 것이 존재한다면 그것의 실행을 막자.
-    public void ExecuteCommand(ICommand command)
+    IEnumerator SkillQCoolTime()
     {
-        if (_AvoidRedundantExecution.Contains(command)) return;
+        _isSkillQ = true;
+        yield return new WaitForSeconds(1);
+        _isSkillQ = false;
     }
 
 }
+
+

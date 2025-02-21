@@ -7,9 +7,6 @@ public interface ICommand
 {
     void Execute();         // 명령실행
     void StopExecute();     // 실행취소
-    
-    //void Redo();    // 재실행
-
 }
 public class MoveCommand : ICommand
 {
@@ -19,8 +16,9 @@ public class MoveCommand : ICommand
     Vector3 _destination;                   // Vector3 목적지
     MonoBehaviour _monoBehaviour;           // 모노비헤이비어 (코루틴을 위해서)
     float _speed;
+    bool _isATrue;
 
-    public MoveCommand(Animator animator, NavMeshAgent agent, AnimationManager animationManager, Vector3 destination, MonoBehaviour monoBehaviour, float speed)
+    public MoveCommand(Animator animator, NavMeshAgent agent, AnimationManager animationManager, Vector3 destination, MonoBehaviour monoBehaviour, float speed, bool isATrue)
     {
         _animator = animator;
         _agent = agent;
@@ -28,14 +26,13 @@ public class MoveCommand : ICommand
         _destination = destination;
         _monoBehaviour = monoBehaviour;
         _speed = speed;
+        _isATrue = isATrue;
     }
 
     public void Execute()
     {
         _animationManager.PlayWalkAnimation(true);  // 애니메이션 매니저를 통해 실행
-
         _agent.SetDestination(_destination);    //내비매쉬로 이동
-
         _monoBehaviour.StartCoroutine(CheckIfReachedDestination()); //목적지까지의 코루틴 확인
     }
 
@@ -55,6 +52,7 @@ public class MoveCommand : ICommand
 
         while (!_agent.isStopped && _agent.remainingDistance > _agent.stoppingDistance)
         {
+            _monoBehaviour.StartCoroutine(AutoFindEnemy());
             yield return null;
         }
 
@@ -63,6 +61,12 @@ public class MoveCommand : ICommand
         //이동 완료 후 애니메이션 정지
         _animationManager.PlayWalkAnimation(false);
         _animationManager.PlayRushAnimation(false);
+    }
+
+    IEnumerator AutoFindEnemy()
+    {
+        //적 탐지 시작
+        yield return new WaitForSeconds(0.05f);
     }
 }
 
@@ -130,51 +134,40 @@ public class StopCommand : ICommand
 
 public class SkillQCommand : ICommand
 {
-    PlayerController _playerController;
     AnimationManager _animationManager;
     Transform _transform;
     Vector3 _skillQRange; // 박스 크기
-    Vector3 _skillQCenter; // 박스 위치 오프셋
+    Vector3 _playerSkillQPosition; // 박스 위치 오프셋
     LayerMask _targetLayer; // 감지할 레이어
+    NavMeshAgent _agent;
 
-    public SkillQCommand(AnimationManager animationManager, Transform transform, Vector3 skillQRange, Vector3 skillQCenter, LayerMask targetLayer) 
+    public SkillQCommand(AnimationManager animationManager, Transform transform, Vector3 skillQRange, Vector3 playerSkillQPosition, LayerMask targetLayer, NavMeshAgent agent) 
     {
         _animationManager = animationManager;
         _transform = transform;
         _skillQRange = skillQRange;
-        _skillQCenter = skillQCenter;
+        _playerSkillQPosition = playerSkillQPosition;
         _targetLayer = targetLayer;
-
+        _agent = agent;
     }
 
     public void Execute()
     {
-        if(_playerController._isPlaying) return;
-        
-        _playerController._isPlaying = true;
-
+        _agent.ResetPath();
         _animationManager.PlaySkillAnimation("IsSkillQ"); // Q 스킬 애니메이션 실행
 
-        Vector3 boxCenter = _transform.position + _skillQCenter; // 박스의 중심
-
         // OverlapBox를 사용하여 박스 내에 존재하는 모든 Collider 가져오기
-        Collider[] hitColliders = Physics.OverlapBox(boxCenter, _skillQRange / 2, _transform.rotation, _targetLayer);
+        Collider[] hitColliders = Physics.OverlapBox(_playerSkillQPosition, _skillQRange / 2, _transform.rotation, _targetLayer);
 
         foreach (Collider col in hitColliders)
         {
             Debug.Log($"감지된 오브젝트: {col.gameObject.name}");
         }
-
-        _playerController._isPlaying = false;
     }
 
     public void StopExecute()
     {
 
     }
-
-
 }
-
-
 
