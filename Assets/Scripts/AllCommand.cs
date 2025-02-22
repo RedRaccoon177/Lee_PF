@@ -17,8 +17,11 @@ public class MoveCommand : ICommand
     MonoBehaviour _monoBehaviour;           // 모노비헤이비어 (코루틴을 위해서)
     float _speed;
     bool _isATrue;
+    Transform _transform;
+    float _detectionRadius = 5f;
+    LayerMask _autofindEnemy;
 
-    public MoveCommand(Animator animator, NavMeshAgent agent, AnimationManager animationManager, Vector3 destination, MonoBehaviour monoBehaviour, float speed, bool isATrue)
+    public MoveCommand(Animator animator, NavMeshAgent agent, AnimationManager animationManager, Vector3 destination, MonoBehaviour monoBehaviour, float speed, bool isATrue, Transform transform, LayerMask autofindEnemy)
     {
         _animator = animator;
         _agent = agent;
@@ -27,6 +30,8 @@ public class MoveCommand : ICommand
         _monoBehaviour = monoBehaviour;
         _speed = speed;
         _isATrue = isATrue;
+        _transform = transform;
+        _autofindEnemy = autofindEnemy;
     }
 
     public void Execute()
@@ -34,6 +39,11 @@ public class MoveCommand : ICommand
         _animationManager.PlayWalkAnimation(true);  // 애니메이션 매니저를 통해 실행
         _agent.SetDestination(_destination);    //내비매쉬로 이동
         _monoBehaviour.StartCoroutine(CheckIfReachedDestination()); //목적지까지의 코루틴 확인
+        if (_isATrue)
+        {
+            Debug.Log("실행됨?");
+            _monoBehaviour.StartCoroutine(AutoFindEnemy());
+        }
     }
 
     public void StopExecute()
@@ -52,7 +62,6 @@ public class MoveCommand : ICommand
 
         while (!_agent.isStopped && _agent.remainingDistance > _agent.stoppingDistance)
         {
-            _monoBehaviour.StartCoroutine(AutoFindEnemy());
             yield return null;
         }
 
@@ -65,8 +74,35 @@ public class MoveCommand : ICommand
 
     IEnumerator AutoFindEnemy()
     {
-        //적 탐지 시작
-        yield return new WaitForSeconds(0.05f);
+        GameObject closestEnemy = null;
+
+        while (closestEnemy == null)
+        {
+            //적 탐지 시작(0.05초 마다)
+            yield return new WaitForSeconds(0.05f);
+
+            Collider[] hitColliders = Physics.OverlapSphere(_transform.position, _detectionRadius, _autofindEnemy);
+            float closestDistance = Mathf.Infinity;
+
+            foreach (Collider col in hitColliders)
+            {
+                float distance = Vector3.Distance(_transform.position, col.transform.position);
+                if (distance < closestDistance)
+                {
+                    closestDistance = distance;
+                    closestEnemy = col.gameObject;
+                }
+            }
+        }
+
+        //_monoBehaviour.StopCoroutine();
+        if (closestEnemy != null)
+        {
+            _agent.SetDestination(closestEnemy.transform.position);
+
+            //목적지로 가다가 만약 또다른 기즈모를 접촉한다면 정지 후 공격 시작
+        }
+
     }
 }
 

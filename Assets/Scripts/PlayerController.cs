@@ -17,8 +17,8 @@ public class PlayerController : MonoBehaviour
     Rigidbody _rigidbody;      
     Transform _transform;
 
-
-    public LayerMask _targetLayer;
+    public LayerMask _autofindEnemy;
+    [Header("스킬에 데미지 받는 레이어")] public LayerMask _skillGetDamageLayer;
     Vector3 _skillQRange = new Vector3(3f, 2f, 3f); // 박스 크기
     Vector3 _skillQCenter = new Vector3(0f, 1.5f, 2f); // 박스 위치 오프셋
     Vector3 _playerSkillQPosition;
@@ -62,8 +62,8 @@ public class PlayerController : MonoBehaviour
 
     void OnDrawGizmos()
     {
+        //스킬 Q 범위
         Gizmos.color = Color.red;
-
         // 기즈모가 그려질 위치 (플레이어 기준 항상 앞으로!)
         Vector3 _playerSkillQPositionGizmo = transform.position
                                 + transform.right * _skillQCenter.x  // 좌우 이동
@@ -72,8 +72,13 @@ public class PlayerController : MonoBehaviour
 
         // 회전 적용 (항상 플레이어 회전 유지)
         Gizmos.matrix = Matrix4x4.TRS(_playerSkillQPositionGizmo, transform.rotation, _skillQRange);
-
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
+
+
+        //Auto공격 범위
+        Gizmos.matrix = Matrix4x4.identity;
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireSphere(transform.position, 5);
     }
     
     void OnEnable()
@@ -113,10 +118,6 @@ public class PlayerController : MonoBehaviour
         {
             GameObject clickedObject = hit.collider.gameObject; // 클릭한 오브젝트
 
-            if (hit.collider.gameObject.name == "Ground")
-            {
-                Debug.Log(hit.collider.gameObject.name);
-            }
             //우클릭 이동
             if (ctx.control.path == "/Mouse/rightButton")
             {
@@ -125,12 +126,6 @@ public class PlayerController : MonoBehaviour
 
                 _iconArrows[0].transform.position =
                     new Vector3(hit.point.x, hit.point.y + 1, hit.point.z); // 기존 마커 이동
-
-                //그냥 이동
-            }
-            else if (ctx.control.path == "/Mouse/leftButton")
-            {
-                //무엇을 클릭하든간에 정보 확인
             }
             //좌클릭 + A => 공격
             else if (ctx.control.path == "/Mouse/leftButton" && _isATrue == true)
@@ -140,17 +135,13 @@ public class PlayerController : MonoBehaviour
 
                 _iconArrows[1].transform.position =
                     new Vector3(hit.point.x, hit.point.y + 1, hit.point.z); // 기존 마커 이동
-
-                _isATrue = false;
             }
 
-            ICommand moveCommand = new MoveCommand(_animator, _agent, _animationManager, hit.point, this, _originalSpeed, _isATrue);
+            ICommand moveCommand = new MoveCommand(_animator, _agent, _animationManager, hit.point, this, _originalSpeed, _isATrue, _transform, _autofindEnemy);
             moveCommand.Execute(); // 이동 실행
 
-            _commandHistory.Enqueue(moveCommand); // 실행한 명령을 스택에 저장 (Undo 기능을 위해)
+            _isATrue = false;
         }
-
-
     }
 
     public void OnStop(InputAction.CallbackContext ctx)
@@ -158,7 +149,7 @@ public class PlayerController : MonoBehaviour
         _IsPlayerContactMoveIcon = true;
         _IsPlayerContactAttackIcon = true;
 
-        if (ctx.performed == true && _commandHistory.Count > 0) // 실행 취소할 명령이 있는지 확인
+        if (ctx.performed == true)
         {
             ICommand stopCommand = new StopCommand(_agent, _animationManager);
             stopCommand.Execute(); // 해당 명령 실행 취소
@@ -195,7 +186,7 @@ public class PlayerController : MonoBehaviour
         }
         _playerSkillQPosition = transform.position + transform.right * _skillQCenter.x + transform.up * _skillQCenter.y + transform.forward * _skillQCenter.z;
 
-        ICommand skillQCommand = new SkillQCommand(_animationManager, _transform, _skillQRange, _playerSkillQPosition, _targetLayer, _agent);
+        ICommand skillQCommand = new SkillQCommand(_animationManager, _transform, _skillQRange, _playerSkillQPosition, _skillGetDamageLayer, _agent);
         skillQCommand.Execute();
     }
     IEnumerator SkillQCoolTime()
