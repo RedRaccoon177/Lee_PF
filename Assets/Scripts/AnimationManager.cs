@@ -24,6 +24,11 @@ public class AnimationManager : MonoBehaviour
         _animator.SetBool("IsRush", isRushing);
     }
 
+    public void PlayIsAttack(string IsAttack)
+    {
+        _animator.SetTrigger(IsAttack);
+    }
+
     public void PlaySkillAnimation(string skillName)
     {
         _animator.SetTrigger(skillName);

@@ -4,17 +4,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.HID;
-using UnityEngine.UIElements;
 
 public class PlayerController : MonoBehaviour
 {
-    Animator _animator;
     NavMeshAgent _agent;                    // 플레이어 이동을 담당하는 NavMeshAgent 컴포넌트
     Camera _camera;                         // 마우스 클릭한 위치를 가져오기 위한 카메라
     PlayerInput _playerInput;               // 플레이어 입력을 감지하는 PlayerInput 컴포넌트
     AnimationManager _animationManager;     // 애니메이션을 관리하는 AnimationManager
-    Rigidbody _rigidbody;      
     Transform _transform;
 
     public LayerMask _autofindEnemy;
@@ -25,7 +21,6 @@ public class PlayerController : MonoBehaviour
 
     Ray _mouseTransform;
 
-    Queue<ICommand> _commandHistory = new Queue<ICommand>(); // 실행한 명령을 저장하는 큐 ( REC용 )
     Stack<ICommand> _AvoidRedundantExecution = new Stack<ICommand>();   //중복 실행을 방지하는
     
     //스피드 관련 필드
@@ -46,14 +41,13 @@ public class PlayerController : MonoBehaviour
     public bool _IsPlayerContactMoveIcon = false;
     public bool _IsPlayerContactAttackIcon = false;
 
+
     void Awake()
     {
-        _animator = GetComponent<Animator>();
         _agent = GetComponent<NavMeshAgent>();  // NavMeshAgent 가져오기 (이동 처리)
         _camera = Camera.main;                  // 메인 카메라 가져오기 (마우스 클릭 감지용)
         _playerInput = GetComponent<PlayerInput>();  // PlayerInput 가져오기 (입력 처리)
         _animationManager = GetComponent<AnimationManager>();  // AnimationManager 가져오기 (애니메이션 제어)
-        _rigidbody = GetComponent<Rigidbody>();
         _transform = GetComponent<Transform>();
 
         _originalSpeed = 4.0f;
@@ -75,10 +69,15 @@ public class PlayerController : MonoBehaviour
         Gizmos.DrawWireCube(Vector3.zero, Vector3.one);
 
 
-        //Auto공격 범위
+        //Auto공격 탐지 범위
         Gizmos.matrix = Matrix4x4.identity;
         Gizmos.color = Color.blue;
         Gizmos.DrawWireSphere(transform.position, 5);
+
+        //Auto공격 실제 범위
+        Gizmos.matrix = Matrix4x4.identity;
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, 2.5f);
     }
     
     void OnEnable()
@@ -101,45 +100,38 @@ public class PlayerController : MonoBehaviour
         _playerInput.actions["Stop"].performed -= OnStop;
         
         _playerInput.actions["Rush"].performed -= OnRush;
-        
+
+        _playerInput.actions["AttackMove"].performed += OnAtttackMove;
+
         _playerInput.actions["SkillQ"].performed -= OnSkillQ;
     }
-
     public void OnMove(InputAction.CallbackContext ctx)
     {
         UnityEngine.Cursor.SetCursor(null, Vector2.zero, CursorMode.Auto);
 
-        // 마우스 클릭한 위치를 가져오기
         Ray ray = _camera.ScreenPointToRay(Mouse.current.position.ReadValue());
-
-        int _layerMasks = LayerMask.GetMask("Ground");    //특정 레이어만 감지
+        int _layerMasks = LayerMask.GetMask("Ground");
 
         if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, _layerMasks))
         {
-            GameObject clickedObject = hit.collider.gameObject; // 클릭한 오브젝트
+            ICommand moveCommand = new MoveCommand(_agent, _animationManager, hit.point, this, _originalSpeed, _isATrue, _transform, _autofindEnemy);
 
-            //우클릭 이동
             if (ctx.control.path == "/Mouse/rightButton")
             {
                 _IsPlayerContactMoveIcon = false;
                 _IsPlayerContactAttackIcon = true;
+                _iconArrows[0].transform.position = new Vector3(hit.point.x, hit.point.y + 1, hit.point.z);
 
-                _iconArrows[0].transform.position =
-                    new Vector3(hit.point.x, hit.point.y + 1, hit.point.z); // 기존 마커 이동
+                moveCommand.Execute();
             }
-            //좌클릭 + A => 공격
             else if (ctx.control.path == "/Mouse/leftButton" && _isATrue == true)
             {
                 _IsPlayerContactMoveIcon = true;
                 _IsPlayerContactAttackIcon = false;
+                _iconArrows[1].transform.position = new Vector3(hit.point.x, hit.point.y + 1, hit.point.z);
 
-                _iconArrows[1].transform.position =
-                    new Vector3(hit.point.x, hit.point.y + 1, hit.point.z); // 기존 마커 이동
+                moveCommand.Execute();
             }
-
-            ICommand moveCommand = new MoveCommand(_animator, _agent, _animationManager, hit.point, this, _originalSpeed, _isATrue, _transform, _autofindEnemy);
-            moveCommand.Execute(); // 이동 실행
-
             _isATrue = false;
         }
     }

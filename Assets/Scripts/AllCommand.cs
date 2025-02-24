@@ -8,22 +8,25 @@ public interface ICommand
     void Execute();         // 명령실행
     void StopExecute();     // 실행취소
 }
+
 public class MoveCommand : ICommand
 {
-    Animator _animator;
-    NavMeshAgent _agent;                    // 내비매쉬
-    AnimationManager _animationManager;     // 애니메이션 매니져
-    Vector3 _destination;                   // Vector3 목적지
-    MonoBehaviour _monoBehaviour;           // 모노비헤이비어 (코루틴을 위해서)
+    NavMeshAgent _agent;
+    AnimationManager _animationManager;
+    Vector3 _destination;
+    MonoBehaviour _monoBehaviour;
     float _speed;
     bool _isATrue;
     Transform _transform;
     float _detectionRadius = 5f;
     LayerMask _autofindEnemy;
+    float _attackdetection = 2.5f;
 
-    public MoveCommand(Animator animator, NavMeshAgent agent, AnimationManager animationManager, Vector3 destination, MonoBehaviour monoBehaviour, float speed, bool isATrue, Transform transform, LayerMask autofindEnemy)
+    GameObject closestEnemy = null;
+    GameObject targetEnemy = null;
+
+    public MoveCommand(NavMeshAgent agent, AnimationManager animationManager, Vector3 destination, MonoBehaviour monoBehaviour, float speed, bool isATrue, Transform transform, LayerMask autofindEnemy)
     {
-        _animator = animator;
         _agent = agent;
         _animationManager = animationManager;
         _destination = destination;
@@ -36,12 +39,14 @@ public class MoveCommand : ICommand
 
     public void Execute()
     {
-        _animationManager.PlayWalkAnimation(true);  // 애니메이션 매니저를 통해 실행
-        _agent.SetDestination(_destination);    //내비매쉬로 이동
-        _monoBehaviour.StartCoroutine(CheckIfReachedDestination()); //목적지까지의 코루틴 확인
+        _monoBehaviour.StopAllCoroutines();
+
+        _animationManager.PlayWalkAnimation(true);
+        _agent.SetDestination(_destination);
+        _monoBehaviour.StartCoroutine(CheckIfReachedDestination());
+
         if (_isATrue)
         {
-            Debug.Log("실행됨?");
             _monoBehaviour.StartCoroutine(AutoFindEnemy());
         }
     }
@@ -49,14 +54,12 @@ public class MoveCommand : ICommand
     public void StopExecute()
     {
         _agent.ResetPath();
-     
-        _animationManager.PlayWalkAnimation(false); // 애니메이션 정지
+        _animationManager.PlayWalkAnimation(false);
+        _animationManager.PlayRushAnimation(false);
     }
 
-    /// <summary>
-    /// 목적지에 도착했는지 확인하는 함수
-    /// </summary>
-    IEnumerator CheckIfReachedDestination()  
+    // 목적지에 도착했는지 확인하는 코루틴
+    IEnumerator CheckIfReachedDestination()
     {
         yield return new WaitForSeconds(0.1f);
 
@@ -74,17 +77,13 @@ public class MoveCommand : ICommand
 
     IEnumerator AutoFindEnemy()
     {
-        GameObject closestEnemy = null;
+        float closestDistance = Mathf.Infinity;
 
         while (closestEnemy == null)
         {
-            //적 탐지 시작(0.05초 마다)
-            yield return new WaitForSeconds(0.05f);
+            Collider[] findEnemySphere = Physics.OverlapSphere(_transform.position, _detectionRadius, _autofindEnemy);
 
-            Collider[] hitColliders = Physics.OverlapSphere(_transform.position, _detectionRadius, _autofindEnemy);
-            float closestDistance = Mathf.Infinity;
-
-            foreach (Collider col in hitColliders)
+            foreach (Collider col in findEnemySphere)
             {
                 float distance = Vector3.Distance(_transform.position, col.transform.position);
                 if (distance < closestDistance)
@@ -93,18 +92,59 @@ public class MoveCommand : ICommand
                     closestEnemy = col.gameObject;
                 }
             }
+            yield return new WaitForSeconds(0.1f);
         }
 
-        //_monoBehaviour.StopCoroutine();
-        if (closestEnemy != null)
+        if(closestEnemy != null)
         {
-            _agent.SetDestination(closestEnemy.transform.position);
+            _monoBehaviour.StartCoroutine(GoToEnemy());
+        }
+    }
 
-            //목적지로 가다가 만약 또다른 기즈모를 접촉한다면 정지 후 공격 시작
+    IEnumerator GoToEnemy()
+    {
+        _agent.SetDestination(closestEnemy.transform.position);
+
+        while (targetEnemy != closestEnemy)
+        {
+            Collider[] isEnemycontactAttackzone = Physics.OverlapSphere(_transform.position, _attackdetection, _autofindEnemy);
+
+            foreach (Collider col in isEnemycontactAttackzone)
+            {
+                if (closestEnemy == col.gameObject)
+                {
+                    targetEnemy = closestEnemy;
+                }
+            }
+            yield return new WaitForSeconds(0.05f);
         }
 
+        if (closestEnemy != null && targetEnemy != null && closestEnemy == targetEnemy)
+        {
+            _monoBehaviour.StartCoroutine(AttackEnemy(targetEnemy));
+        }
+    }
+
+    IEnumerator AttackEnemy(GameObject targetEnemy)
+    {
+        GameObject enemy = targetEnemy.GetComponent<EnemyHealth>().gameObject;
+        EnemyHealth enemyHealth = enemy.GetComponent<EnemyHealth>();
+
+        while (enemyHealth.currentHealth > 0)
+        {
+            _transform.LookAt(enemy.transform.position);
+            _agent.ResetPath();
+            _animationManager.PlayIsAttack("IsAttack");
+
+            enemyHealth.TakeDamage(20);
+
+            yield return new WaitForSeconds(1f);
+        }
+
+        _monoBehaviour.StartCoroutine(AutoFindEnemy());
     }
 }
+
 
 public class RushCommand : ICommand
 {
