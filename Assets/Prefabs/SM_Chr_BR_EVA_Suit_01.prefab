@@ -156,6 +156,10 @@ PrefabInstance:
       propertyPath: m_Layer
       value: 7
       objectReference: {fileID: 0}
+    - target: {fileID: 1441875363411674, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 1476455342823062, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
       propertyPath: m_Layer
       value: 7
@@ -306,7 +310,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4350046931891536, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -2.279
+      value: -14.13
       objectReference: {fileID: 0}
     - target: {fileID: 4350046931891536, guid: 6e213ea18accacb4292f3c4fc3f439f7, type: 3}
       propertyPath: m_LocalRotation.w
@@ -450,8 +454,6 @@ MonoBehaviour:
   _skillGetDamageLayer:
     serializedVersion: 2
     m_Bits: 7232
-  _attackCursor: {fileID: 2800000, guid: 8c89ed5746a4faa48bb97701cc2f2e35, type: 3}
-  hotSpot: {x: 0, y: 0}
   _iconArrows:
   - {fileID: 0}
   - {fileID: 0}

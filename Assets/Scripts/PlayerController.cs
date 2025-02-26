@@ -1,9 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.HID;
 
 public class PlayerController : MonoBehaviour
 {
@@ -29,17 +31,17 @@ public class PlayerController : MonoBehaviour
 
     bool _isSkillQ = false;
 
-    //커서 이미지
-    public Texture2D _attackCursor;
-    public Vector2 hotSpot = Vector2.zero; // 기준점
-
-    //A를 누르고 좌클릭 참/거짓 값
+    //좌클릭 공격 / 우클릭 이동
     bool _isATrue = false;
 
     public GameObject[] _iconArrows;
 
     public bool _IsPlayerContactMoveIcon = false;
     public bool _IsPlayerContactAttackIcon = false;
+
+    private Coroutine SkillQCo;
+
+    private MoveCommand _moveCommand;  // MoveCommand를 한번만 생성하여 재사용
 
 
     void Awake()
@@ -87,8 +89,6 @@ public class PlayerController : MonoBehaviour
         _playerInput.actions["Stop"].performed += OnStop;   // 실행 취소 입력 등록
         
         _playerInput.actions["Rush"].performed += OnRush;   // 점프 입력 등록
-
-        _playerInput.actions["AttackMove"].performed += OnAtttackMove;
         
         _playerInput.actions["SkillQ"].performed += OnSkillQ; // 스킬 Q 입력 등록
     }
@@ -101,8 +101,6 @@ public class PlayerController : MonoBehaviour
         
         _playerInput.actions["Rush"].performed -= OnRush;
 
-        _playerInput.actions["AttackMove"].performed += OnAtttackMove;
-
         _playerInput.actions["SkillQ"].performed -= OnSkillQ;
     }
     public void OnMove(InputAction.CallbackContext ctx)
@@ -114,7 +112,11 @@ public class PlayerController : MonoBehaviour
 
         if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, _layerMasks))
         {
-            ICommand moveCommand = new MoveCommand(_agent, _animationManager, hit.point, this, _originalSpeed, _isATrue, _transform, _autofindEnemy);
+            if (_moveCommand == null)
+            {
+                // 최초 1회만 생성
+                _moveCommand = new MoveCommand(_agent, _animationManager, hit.point, this, _originalSpeed, _isATrue, _transform, _autofindEnemy);
+            }
 
             if (ctx.control.path == "/Mouse/rightButton")
             {
@@ -122,17 +124,39 @@ public class PlayerController : MonoBehaviour
                 _IsPlayerContactAttackIcon = true;
                 _iconArrows[0].transform.position = new Vector3(hit.point.x, hit.point.y + 1, hit.point.z);
 
-                moveCommand.Execute();
+                // 기존 객체를 재사용하고, 목적지만 변경
+                _moveCommand.SetDestination(_agent, _animationManager, hit.point, _originalSpeed, _isATrue, _transform, _autofindEnemy);
+
+                _moveCommand.Execute();
             }
-            else if (ctx.control.path == "/Mouse/leftButton" && _isATrue == true)
+            else if (ctx.control.path == "/Mouse/leftButton")
             {
+                _isATrue = true;
+
                 _IsPlayerContactMoveIcon = true;
                 _IsPlayerContactAttackIcon = false;
                 _iconArrows[1].transform.position = new Vector3(hit.point.x, hit.point.y + 1, hit.point.z);
 
-                moveCommand.Execute();
+                // 기존 객체를 재사용하고, 목적지만 변경
+                _moveCommand.SetDestination(_agent, _animationManager, hit.point, _originalSpeed, _isATrue, _transform, _autofindEnemy);
+
+                _moveCommand.Execute();
             }
             _isATrue = false;
+        }
+    }
+    public void DealDamage()
+    {
+        if (_moveCommand == null) return; // 이동 명령이 없으면 리턴
+
+        GameObject target = _moveCommand.GetTargetEnemy(); // 현재 타겟 가져오기
+        if (target == null) return; // 타겟이 없으면 리턴
+
+        EnemyHealth enemyHealth = target.GetComponent<EnemyHealth>();
+        if (enemyHealth != null)
+        {
+            enemyHealth.TakeDamage(10); // 애니메이션 타이밍에 데미지 적용
+            Debug.Log(target.name + "에게 애니메이션 이벤트로 데미지 10!");
         }
     }
 
@@ -143,7 +167,7 @@ public class PlayerController : MonoBehaviour
 
         if (ctx.performed == true)
         {
-            ICommand stopCommand = new StopCommand(_agent, _animationManager);
+            ICommand stopCommand = new StopCommand(_agent, _animationManager, this);
             stopCommand.Execute(); // 해당 명령 실행 취소
         }
     }
@@ -156,16 +180,10 @@ public class PlayerController : MonoBehaviour
         _AvoidRedundantExecution.Push(rushCommand);
     }
 
-    public void OnAtttackMove(InputAction.CallbackContext ctx)
-    {
-        UnityEngine.Cursor.SetCursor(_attackCursor, hotSpot, CursorMode.Auto);
-        _isATrue = true;
-    }
-
     public void OnSkillQ(InputAction.CallbackContext ctx)
     {
         if (_isSkillQ) return;
-        StartCoroutine(SkillQCoolTime());
+        SkillQCo = StartCoroutine(SkillQCoolTime());
 
         _IsPlayerContactMoveIcon = true;
         _IsPlayerContactAttackIcon = true;
