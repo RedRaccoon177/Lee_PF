@@ -3,29 +3,30 @@ using UnityEngine;
 public class EnemyHealth : MonoBehaviour
 {
     [Header("적의 최대 체력")]
-    public float maxHealth = 100f;
+    public int maxHealth = 100;
     public float currentHealth;
 
     [Header("적 사망 이펙트")]
     public GameObject deathEffect; // 죽을 때 이펙트 (선택)
 
-    private void Start()
+    void Start()
     {
         currentHealth = maxHealth; // 시작 체력 설정
     }
 
-    public void TakeDamage(float damage)
+    public void TakeDamage(int damage)
     {
         currentHealth -= damage;
         Debug.Log(gameObject.name + " 피격! 남은 체력: " + currentHealth);
 
         if (currentHealth <= 0)
         {
+            currentHealth = 0;
             Die();
         }
     }
 
-    private void Die()
+    void Die()
     {
         Debug.Log(gameObject.name + " 사망!");
 

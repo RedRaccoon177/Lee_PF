@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Selectable_Char
   - Icon
+  - Enemy
   layers:
   - Default
   - TransparentFX
