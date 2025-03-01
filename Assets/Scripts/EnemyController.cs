@@ -6,8 +6,10 @@ using UnityEngine.UIElements;
 
 public class EnemyController : MonoBehaviour
 {
+    EnemyHealth _enemyHealth;
+
     Vector3 _playerPosition;
-    Vector3 _destination;
+    Vector3 _destination = new Vector3(1,1,1);
     NavMeshAgent _agent;
 
     Vector3 _skillQRange = new Vector3(4f, 2f, 4f); // 박스 크기
@@ -16,6 +18,11 @@ public class EnemyController : MonoBehaviour
     LayerMask _layerMask;
 
     Animator _animator;
+
+    void Awake()
+    {
+        _enemyHealth = GetComponent<EnemyHealth>();
+    }
 
     void Start()
     {
@@ -32,6 +39,12 @@ public class EnemyController : MonoBehaviour
         StartCoroutine(AttackPlayer());
     }
 
+    void OnEnable()
+    {
+        HealthBarManager.Instance.RegisterEnemy(this);
+    }
+
+
     void OnDisable()
     {
         if (ShooterController._instance != null)
@@ -39,6 +52,7 @@ public class EnemyController : MonoBehaviour
             ShooterController._instance.OnShooterPositionChanged -= UpdatePlayerPosition;
         }
     }
+
     void OnDrawGizmos()
     {
         // 몬스터의 평타 공격 범위
@@ -137,6 +151,10 @@ public class EnemyController : MonoBehaviour
 
     public void ResetEnemy()
     {
+        _enemyHealth.currentHealth = _enemyHealth.maxHealth;
+
+        _destination = new Vector3(1, 1, 1);
+
         _layerMask = LayerMask.GetMask("Player");
         _animator = GetComponent<Animator>();
         _agent = GetComponent<NavMeshAgent>();
@@ -149,4 +167,15 @@ public class EnemyController : MonoBehaviour
         StartCoroutine(MoveToTarget());
         StartCoroutine(AttackPlayer());
     }
+
+    public float GetHealthPercentage()
+    {
+        return _enemyHealth.currentHealth / (float)_enemyHealth.maxHealth;
+    }
+    public void Die()
+    {
+        HealthBarManager.Instance.UnregisterEnemy(this); // 체력바 제거
+        gameObject.SetActive(false); // 풀링을 위해 비활성화
+    }
+
 }

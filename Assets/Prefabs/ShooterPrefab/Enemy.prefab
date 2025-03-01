@@ -210,7 +210,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 100
   currentHealth: 0
-  deathEffect: {fileID: 0}
+  deathEffect: {fileID: 9080140021571130472, guid: 5a91674310f9cc4408945dc89eab9110, type: 3}
 --- !u!114 &4977369122876421406
 MonoBehaviour:
   m_ObjectHideFlags: 0

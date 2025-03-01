@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Pool;
@@ -7,6 +8,8 @@ using UnityEngine.UIElements;
 
 public class ObjectPoolManager : MonoBehaviour
 {
+    public static ObjectPoolManager Instance { get; private set; }
+
     [SerializeField] GameObject monsterPrefab;  //몬스터 프리펩
 
     [SerializeField] ParticleSystem muzzleParticle; // 총구 화염 프리팹
@@ -30,6 +33,9 @@ public class ObjectPoolManager : MonoBehaviour
 
     void Awake()
     {
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+
         muzzleFlashPool = new ObjectPool<ParticleSystem>
             (
                 createFunc: () => Instantiate(muzzleParticle, transform), // 새로운 파티클 생성
@@ -135,7 +141,7 @@ public class ObjectPoolManager : MonoBehaviour
         StartCoroutine(SpawnMonsters());
     }
 
-    private Vector3 GetSpawnPosition()
+    Vector3 GetSpawnPosition()
     {
         if (spawnPoints.Count == 0)
         {
@@ -144,7 +150,6 @@ public class ObjectPoolManager : MonoBehaviour
 
         return spawnPoints[Random.Range(0, spawnPoints.Count)].position;
     }
-
     IEnumerator SpawnMonsters()
     {
         while (true)
@@ -153,6 +158,12 @@ public class ObjectPoolManager : MonoBehaviour
             monster.transform.position = GetSpawnPosition();
             yield return new WaitForSeconds(_spawnTime); // 2초마다 스폰
         }
+    }
+
+
+    public void MonsterRelease(GameObject monster)
+    {
+        monsterPool.Release(monster);
     }
 
 

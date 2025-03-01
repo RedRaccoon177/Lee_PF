@@ -1,3 +1,4 @@
+using UnityEditor.EditorTools;
 using UnityEngine;
 
 public class EnemyHealth : MonoBehaviour
@@ -28,7 +29,11 @@ public class EnemyHealth : MonoBehaviour
 
     void Die()
     {
-        Debug.Log(gameObject.name + " 사망!");
+        EnemyController enemyController = GetComponent<EnemyController>();
+        if (enemyController != null)
+        {
+            enemyController.Die(); // EnemyController의 Die()를 호출
+        }
 
         // 사망 이펙트 생성 (선택 사항)
         if (deathEffect != null)
@@ -36,7 +41,6 @@ public class EnemyHealth : MonoBehaviour
             Instantiate(deathEffect, transform.position, Quaternion.identity);
         }
 
-        // 적 삭제
-        Destroy(gameObject);
+        ObjectPoolManager.Instance.MonsterRelease(gameObject);
     }
 }
