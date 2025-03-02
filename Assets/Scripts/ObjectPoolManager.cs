@@ -11,23 +11,20 @@ public class ObjectPoolManager : MonoBehaviour
     public static ObjectPoolManager Instance { get; private set; }
 
     [SerializeField] GameObject monsterPrefab;  //몬스터 프리펩
+    [SerializeField] ParticleSystem muzzleParticle;     // 총구 화염 프리팹
+    [SerializeField] ParticleSystem bulletParticle;     // 탄알 궤적 프리팹
+    [SerializeField] ParticleSystem hitParticle;        // 탄알 막힌 곳
+    [SerializeField] ParticleSystem enemyDieParticle;   // 적 사망 시 이펙트
 
-    [SerializeField] ParticleSystem muzzleParticle; // 총구 화염 프리팹
-    [SerializeField] int defaultPoolSize = 10; // 기본 풀 크기
-    
-    [SerializeField] ParticleSystem bulletParticle; // 탄알 궤적 프리팹
-    //[SerializeField] float trailDuration = 0.05f; // 탄알 궤적 이동 시간
-
-    [SerializeField] ParticleSystem hitParticle;    //탄알 막힌 곳
-
-    //[SerializeField] int PoolSize = 10; // 기본 풀 크기
+    [SerializeField] int defaultPoolSize = 20; // 기본 풀 크기
 
     float _spawnTime = 2f;
 
-    ObjectPool<ParticleSystem> muzzleFlashPool; //총구 화염 풀
-    ObjectPool<ParticleSystem> bulletTrailPool; //총 궤적 풀
-    ObjectPool<ParticleSystem> hitPointPool;    //총알 자국 풀
-    ObjectPool<GameObject> monsterPool;         //몬스터 풀
+    ObjectPool<GameObject> monsterPool;                 // 몬스터 풀
+    ObjectPool<ParticleSystem> muzzleFlashPool;         // 총구 화염 풀
+    ObjectPool<ParticleSystem> bulletTrailPool;         // 총 궤적 풀
+    ObjectPool<ParticleSystem> hitPointPool;            // 총알 자국 풀
+    ObjectPool<ParticleSystem> enemyDieParticlePool;    // 적 사망 이펙트 풀
 
     [SerializeField] private List<Transform> spawnPoints; // 지정된 몬스터 스폰 위치 목록
 
@@ -109,6 +106,31 @@ public class ObjectPoolManager : MonoBehaviour
                 maxSize: defaultPoolSize * 2
             );
 
+        enemyDieParticlePool = new ObjectPool<ParticleSystem>
+            (
+                createFunc: () => Instantiate(enemyDieParticle, transform), // 새로운 파티클 생성
+
+                //풀에서 오브젝트를 꺼낼 때 실행
+                actionOnGet: (particle) =>
+                {
+                    particle.gameObject.SetActive(true);
+                    particle.Play();
+                },
+
+                actionOnRelease: (particle) =>
+                {
+                    particle.gameObject.SetActive(false);
+                },
+
+                actionOnDestroy: (particle) => Destroy(particle.gameObject),
+
+                collectionCheck: false,
+
+                defaultCapacity: defaultPoolSize,
+
+                maxSize: defaultPoolSize * 2
+            );
+
         monsterPool = new ObjectPool<GameObject>
             (
             createFunc: () => Instantiate(monsterPrefab, transform), // 몬스터 프리팹 생성
@@ -117,7 +139,7 @@ public class ObjectPoolManager : MonoBehaviour
             actionOnGet: (monster) =>
             {
                 monster.SetActive(true);
-                monster.transform.position = GetSpawnPosition(); // 지정된 위치에서 스폰
+                monster.transform.position = GetEnemySpawnPosition(); // 지정된 위치에서 스폰
                 monster.GetComponent<EnemyController>().ResetEnemy(); // 초기화 함수 호출
             },
 
@@ -141,7 +163,8 @@ public class ObjectPoolManager : MonoBehaviour
         StartCoroutine(SpawnMonsters());
     }
 
-    Vector3 GetSpawnPosition()
+    // 적 관련 함수
+    Vector3 GetEnemySpawnPosition()
     {
         if (spawnPoints.Count == 0)
         {
@@ -155,18 +178,16 @@ public class ObjectPoolManager : MonoBehaviour
         while (true)
         {
             GameObject monster = monsterPool.Get(); // 풀에서 몬스터 꺼내기
-            monster.transform.position = GetSpawnPosition();
+            monster.transform.position = GetEnemySpawnPosition();
             yield return new WaitForSeconds(_spawnTime); // 2초마다 스폰
         }
     }
-
-
     public void MonsterRelease(GameObject monster)
     {
         monsterPool.Release(monster);
     }
 
-
+    // 총구 이펙트 함수
     public void SpawnMuzzleFlash(Vector3 position, Quaternion rotation)
     {
         ParticleSystem flash = muzzleFlashPool.Get();
@@ -181,7 +202,7 @@ public class ObjectPoolManager : MonoBehaviour
         muzzleFlashPool.Release(flash);
     }
 
-
+    // 총알 궤도 함수 + 타격 시
     public void SpawnBulletTrail(Vector3 start, Vector3 target, float speed)
     {
         // 총알을 특정 방향으로 발사
@@ -233,5 +254,21 @@ public class ObjectPoolManager : MonoBehaviour
         yield return new WaitForSeconds(hitPoint.main.duration);
         hitPointPool.Release(hitPoint);
     }
+
+    // 적 사망 시 이펙트 함수
+    public void SpawnEnemyDieParticle(Vector3 position, Quaternion rotation)
+    {
+        ParticleSystem dieParticle = enemyDieParticlePool.Get();
+        dieParticle.transform.SetPositionAndRotation(position, rotation);
+
+        // 파티클 재사용을 위해 자동 반환
+        StartCoroutine(Releasedieeffect(dieParticle));
+    }
+    IEnumerator Releasedieeffect(ParticleSystem dieParticle)
+    {
+        yield return new WaitForSeconds(dieParticle.main.duration);
+        enemyDieParticlePool.Release(dieParticle);
+    }
+
 
 }

@@ -3,12 +3,8 @@ using UnityEngine;
 
 public class EnemyHealth : MonoBehaviour
 {
-    [Header("적의 최대 체력")]
-    public int maxHealth = 100;
-    public float currentHealth;
-
-    [Header("적 사망 이펙트")]
-    public GameObject deathEffect; // 죽을 때 이펙트 (선택)
+    [Header("적의 최대 체력")] public int maxHealth = 100;
+    [Header("적의 현재 체력")] public float currentHealth;
 
     void Start()
     {
@@ -35,12 +31,7 @@ public class EnemyHealth : MonoBehaviour
             enemyController.Die(); // EnemyController의 Die()를 호출
         }
 
-        // 사망 이펙트 생성 (선택 사항)
-        if (deathEffect != null)
-        {
-            Instantiate(deathEffect, transform.position, Quaternion.identity);
-        }
-
+        ObjectPoolManager.Instance.SpawnEnemyDieParticle(transform.position, transform.rotation);
         ObjectPoolManager.Instance.MonsterRelease(gameObject);
     }
 }

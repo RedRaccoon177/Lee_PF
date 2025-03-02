@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.XR;
+using UnityEngine.UI;
 
 public class ShooterController : MonoBehaviour
 {
@@ -44,9 +46,6 @@ public class ShooterController : MonoBehaviour
     public Transform _muzzleTransform;
     public Transform _muzzleTransform1;
 
-    //총을 장전 중이냐?
-    public bool _isReloading = false;
-
     Vector3 _targetEemeyPosition = new Vector3 (0, 0, 0);
 
     //마우스 좌표 확인용
@@ -57,10 +56,26 @@ public class ShooterController : MonoBehaviour
 
     [Header("플레이어 최대 체력")] public int _maxHealth = 100;
     [Header("플레이어 현재 체력")] public int _currentHealth;
+    [Header("체력 UI")][SerializeField] Slider _healthSlider; 
+
 
     public event Action<Vector3> OnShooterPositionChanged; // 적들에게 전달할 옵저버 이벤트
     private Vector3 _lastPosition;   //전에 위치한 위치
     [SerializeField] private float _positionThreshold = 0.5f; // 위치 변화 감지 기준
+
+    [Header("총알 설정")]
+    [SerializeField] int _magazineCapacity = 30; // 탄창 크기
+    [SerializeField] int _maxReserveAmmo = 999; // 최대 보유 가능한 총알
+    [SerializeField] int _startAmmo = 270;
+    int _currentAmmoInMagazine; // 현재 탄창 총알
+    int _currentReserveAmmo; // 현재 예비 탄약
+
+    [Header("총알 UI")]
+    [SerializeField] private TextMeshProUGUI _ammoText; // 탄창 UI
+
+    [Header("재장전 설정")]
+    [SerializeField] private float _reloadTime = 2f; // 장전 시간
+    public bool _isReloading = false; // 장전 중인지 체크
 
     void Awake()
     {
@@ -81,6 +96,17 @@ public class ShooterController : MonoBehaviour
         _shooterReloadCommand = new ShooterReloadCommand(this, _shooterAnimationManager);
 
         _currentHealth = _maxHealth;
+        if (_healthSlider != null)
+        {
+            _healthSlider.maxValue = _maxHealth; // 최대 체력 설정
+            _healthSlider.value = _currentHealth; // 현재 체력 설정
+        }
+
+        // 초기 탄약 설정
+        _currentAmmoInMagazine = _magazineCapacity; // 탄창 가득 채우기
+        _currentReserveAmmo = _startAmmo; // 예비 총알 지정
+
+        UpdateAmmoUI(); // 초기 UI 설정
     }
 
     void OnDrawGizmos()
@@ -95,7 +121,6 @@ public class ShooterController : MonoBehaviour
 
         Gizmos.DrawLine(startPos, _targetEemeyPosition);
     }
-
     void OnEnable()
     {
         // 입력 액션 매핑
@@ -122,7 +147,6 @@ public class ShooterController : MonoBehaviour
         _reloadAction.Enable();
         
     }
-
     void OnDisable()
     {
         // 입력 이벤트에서 함수 제거
@@ -167,7 +191,6 @@ public class ShooterController : MonoBehaviour
         Vector2 input = ctx.ReadValue<Vector2>();
         _moveInput = new Vector3(input.x, 0, input.y);
     }
-
     void Move()
     {
         if (moveInput.magnitude == 0) return; // 입력값이 없으면 이동하지 않음
@@ -243,7 +266,16 @@ public class ShooterController : MonoBehaviour
 
     void OnShoot(InputAction.CallbackContext ctx)
     {
-        _shooterShootCommand.Execute();
+        if (_currentAmmoInMagazine > 0 && !_isReloading) // 탄창에 총알이 있으면 발사 가능
+        {
+            _currentAmmoInMagazine--; // 한 발 소비
+            _shooterShootCommand.Execute();
+            UpdateAmmoUI(); // 총기 발사 후 UI 갱신
+        }
+        else
+        {
+            Debug.Log("탄창이 비었습니다! R키를 눌러 장전하세요.");
+        }
     }
     public Vector3 GetAimTarget()
     {
@@ -257,23 +289,46 @@ public class ShooterController : MonoBehaviour
 
     void OnReload(InputAction.CallbackContext ctx)
     {
-        if (_isReloading) return;
-        _isReloading = true;
-
         //_shooterReloadCommand.Execute();
 
+        if (_currentReserveAmmo <= 0 || _isReloading) return;
+        _isReloading = true;
         _shooterAnimationManager.PlayReload(_isReloading);
         StartCoroutine(IsReloading());
-
     }
     IEnumerator IsReloading()
     {
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(_reloadTime);
+
+        // 필요한 만큼 탄창 채우기
+        int ammoNeeded = _magazineCapacity - _currentAmmoInMagazine; // 탄창이 채워져야 할 개수
+        int ammoToLoad = Mathf.Min(ammoNeeded, _currentReserveAmmo); // 예비 총알에서 빼올 수 있는 개수
+
+        _currentAmmoInMagazine += ammoToLoad; // 탄창에 추가
+        _currentReserveAmmo -= ammoToLoad; // 예비 탄약에서 차감
+
+        UpdateAmmoUI(); // 장전 후 UI 갱신
 
         _isReloading = false;
         _shooterAnimationManager.PlayReload(_isReloading);
     }
 
+
+    public void AddAmmo(int amount) // 총알 획득 시 호출
+    {
+        _currentReserveAmmo = Mathf.Min(_currentReserveAmmo + amount, _maxReserveAmmo);
+        UpdateAmmoUI(); // 총알 획득 후 UI 갱신
+        Debug.Log($" 총알 {amount}개 획득! 현재 예비 탄약: {_currentReserveAmmo}");
+    }
+    private void UpdateAmmoUI()
+    {
+        if (_ammoText != null)
+        {
+            _ammoText.text = $"{_currentAmmoInMagazine} / {_currentReserveAmmo}";
+        }
+    }
+
+    // Shooter의 위치를 옵저버 패턴으로 뿌림
     void ShooterTransformObserver()
     {
         if (Vector3.Distance(transform.position, _lastPosition) > _positionThreshold)
@@ -283,25 +338,37 @@ public class ShooterController : MonoBehaviour
         }
     }
 
-
     public void TakeDamage(int damage)
     {
-        _currentHealth -= damage;
+        if(_currentHealth  > 0) _currentHealth -= damage;
 
-        Debug.Log(_currentHealth);
+        UpdateHealthUI(); // 슬라이더 UI 업데이트
 
-        if(_currentHealth <= 0)
+        if (_currentHealth <= 0)
         {
             _currentHealth = 0;
             Die();
         }
     }
+    public void Heal(int healAmount)
+    {
+        _currentHealth += healAmount;
+        _currentHealth = Mathf.Clamp(_currentHealth, 0, _maxHealth);
 
+        UpdateHealthUI(); // 슬라이더 UI 업데이트
+    }
+    private void UpdateHealthUI()
+    {
+        if (_healthSlider != null)
+        {
+            _healthSlider.value = _currentHealth; // 체력 UI 업데이트
+        }
+        Debug.Log(_currentHealth);
+    }
     void Die()
     {
-        //TODO: 플레이어 사망 구현
-        //사망 이펙트 출력
-        //게임 오버 출력
+        Debug.Log("플레이어 사망!");
+        //TODO: 사망 애니메이션 & 게임 오버 처리
     }
 
 }

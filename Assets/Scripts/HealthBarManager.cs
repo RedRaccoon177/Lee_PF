@@ -17,26 +17,89 @@ public class HealthBarManager : MonoBehaviour
         else Destroy(gameObject); // 중복된 매니저 삭제
     }
 
+    // 연산 최적화를 위해 Update 대신 LateUpdate 사용
+    void LateUpdate()
+    {
+        List<EnemyController> toRemove = new List<EnemyController>();
+
+        foreach (var entry in healthBars)
+        {
+            EnemyController enemy = entry.Key;
+            RectTransform healthBar = entry.Value;
+
+            if (enemy == null || !enemy.gameObject.activeInHierarchy)
+            {
+                toRemove.Add(enemy);
+                continue;
+            }
+
+            // 체력이 0이면 체력바 숨김
+            if (enemy.GetHealthPercentage() <= 0f)
+            {
+                healthBar.gameObject.SetActive(false);
+                continue;
+            }
+
+            // 화면 안에 있는 적만 체력바 업데이트
+            if (IsEnemyVisible(enemy))
+            {
+                UpdateHealthBarPosition(enemy);
+                healthBar.GetComponent<Slider>().value = enemy.GetHealthPercentage();
+            }
+        }
+
+        // 사라진 적의 체력바 제거
+        foreach (var enemy in toRemove)
+        {
+            UnregisterEnemy(enemy);
+        }
+    }
+
     // 적이 생성되었을 때 체력바를 추가하는 함수
     public void RegisterEnemy(EnemyController enemy)
     {
-        if (!healthBars.ContainsKey(enemy)) // 이미 등록된 적이 아니라면
+        if (!healthBars.ContainsKey(enemy)) // 적이 처음 생성된 경우만 체력바 추가
         {
-            GameObject newHealthBar = Instantiate(healthBarPrefab, healthBarContainer); // 새로운 체력바 생성
-            RectTransform healthBar = newHealthBar.GetComponent<RectTransform>(); // RectTransform 참조 가져오기
-            healthBars[enemy] = healthBar; // Dictionary에 저장
+            GameObject newHealthBar = Instantiate(healthBarPrefab, healthBarContainer);
+            RectTransform healthBar = newHealthBar.GetComponent<RectTransform>();
+
+            // 처음에는 화면 밖으로 배치 후 비활성화
+            healthBar.position = new Vector3(-1000, -1000, 0);
+            healthBar.gameObject.SetActive(false);
+
+            healthBars[enemy] = healthBar;
         }
 
-        // 풀링된 몬스터가 다시 활성화될 때 체력바 위치 초기화
+        // 새롭게 생성된 적은 체력도 초기화해야 함
+        ResetHealthBar(enemy);
+
+        // 적이 처음 등장할 때 강제로 체력바 업데이트 실행
         UpdateHealthBarPosition(enemy);
+
+        // 강제로 체력바 활성화 (첫 번째 적을 위해 추가)
+        if (IsEnemyVisible(enemy))
+        {
+            healthBars[enemy].gameObject.SetActive(true);
+        }
+    }
+
+    private void ResetHealthBar(EnemyController enemy)
+    {
+        if (healthBars.TryGetValue(enemy, out RectTransform healthBar))
+        {
+            healthBar.GetComponent<Slider>().value = 1f; // 체력 100%로 초기화
+            healthBar.position = new Vector3(-1000, -1000, 0); // 화면 밖으로 배치
+            healthBar.gameObject.SetActive(false); // 비활성화
+        }
     }
 
     // 적이 제거될 때 체력바도 삭제하는 함수
     public void UnregisterEnemy(EnemyController enemy)
     {
-        if (healthBars.ContainsKey(enemy)) // 적이 존재하면
+        if (healthBars.ContainsKey(enemy))
         {
-            Destroy(healthBars[enemy].gameObject); // 체력바 UI 삭제
+            healthBars[enemy].gameObject.SetActive(false); // 체력바 즉시 숨기기
+            healthBars[enemy].position = new Vector3(-1000, -1000, 0); // 화면 밖으로 이동
             healthBars.Remove(enemy); // Dictionary에서 제거
         }
     }
@@ -44,53 +107,34 @@ public class HealthBarManager : MonoBehaviour
     // 적의 위치에 따라 체력바를 UI에 갱신하는 함수
     public void UpdateHealthBarPosition(EnemyController enemy)
     {
-        if (enemy == null || !healthBars.ContainsKey(enemy)) return; // 적이 없거나 체력바가 없으면 무시
+        if (enemy == null || !healthBars.ContainsKey(enemy)) return;
 
-        RectTransform healthBar = healthBars[enemy]; // 해당 적의 체력바 가져오기
+        RectTransform healthBar = healthBars[enemy];
 
-        // 월드 좌표 → 스크린 좌표 변환 (적 머리 위로 이동)
+        // 월드 좌표 → 스크린 좌표 변환
         Vector3 screenPos = Camera.main.WorldToScreenPoint(enemy.transform.position + Vector3.up * 4f);
 
-        // 카메라 뒤쪽에 있을 경우 체력바를 숨김
-        if (screenPos.z > 0)
+        // 체력 확인 (체력이 0이면 숨김)
+        float healthValue = enemy.GetHealthPercentage();
+        if (healthValue <= 0f)
         {
-            healthBar.position = screenPos; // 체력바 위치 업데이트
-            healthBar.gameObject.SetActive(true); // 체력바 활성화
+            healthBar.gameObject.SetActive(false);
+            return;
+        }
+
+        // 강제 활성화 조건 추가 (첫 번째 적도 제대로 표시되도록)
+        if (screenPos.z > 0 && screenPos.x > 0 && screenPos.x < Screen.width && screenPos.y > 0 && screenPos.y < Screen.height)
+        {
+            healthBar.position = screenPos;
+            if (!healthBar.gameObject.activeSelf)
+            {
+                healthBar.gameObject.SetActive(true);
+            }
         }
         else
         {
-            healthBar.gameObject.SetActive(false); // 체력바 숨김
-        }
-    }
-
-    // 연산 최적화를 위해 `Update()` 대신 `LateUpdate()` 사용
-    void LateUpdate()
-    {
-        List<EnemyController> toRemove = new List<EnemyController>(); // 삭제할 적 목록
-
-        foreach (var entry in healthBars)
-        {
-            EnemyController enemy = entry.Key;
-            RectTransform healthBar = entry.Value;
-
-            if (enemy == null || !enemy.gameObject.activeInHierarchy) // 적이 사라졌거나 비활성화되었을 경우
-            {
-                toRemove.Add(enemy); // 삭제 리스트에 추가
-                continue;
-            }
-
-            // 카메라에 보이는 적만 체력바 갱신
-            if (IsEnemyVisible(enemy))
-            {
-                UpdateHealthBarPosition(enemy); // 적의 위치에 맞게 체력바 갱신
-                healthBar.GetComponent<Slider>().value = enemy.GetHealthPercentage(); // 체력 퍼센트 UI 업데이트
-            }
-        }
-
-        // 비활성화된 적들의 체력바 제거
-        foreach (var enemy in toRemove)
-        {
-            UnregisterEnemy(enemy);
+            healthBar.position = new Vector3(-1000, -1000, 0);
+            healthBar.gameObject.SetActive(false);
         }
     }
 

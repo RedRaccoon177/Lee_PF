@@ -19,6 +19,8 @@ public class EnemyController : MonoBehaviour
 
     Animator _animator;
 
+    bool _isCoroutine = false;
+
     void Awake()
     {
         _enemyHealth = GetComponent<EnemyHealth>();
@@ -26,6 +28,7 @@ public class EnemyController : MonoBehaviour
 
     void Start()
     {
+        HealthBarManager.Instance.RegisterEnemy(this);
         _layerMask = LayerMask.GetMask("Player");
         _animator = GetComponent<Animator>();
         _agent = GetComponent<NavMeshAgent>();
@@ -35,12 +38,17 @@ public class EnemyController : MonoBehaviour
             ShooterController._instance.OnShooterPositionChanged += UpdatePlayerPosition;
         }
 
-        StartCoroutine(MoveToTarget());
-        StartCoroutine(AttackPlayer());
+        if (!_isCoroutine)
+        {
+            _isCoroutine = true;
+            StartCoroutine(MoveToTarget());
+            StartCoroutine(AttackPlayer());
+        }
     }
 
     void OnEnable()
     {
+        if(HealthBarManager.Instance != null)
         HealthBarManager.Instance.RegisterEnemy(this);
     }
 
@@ -83,6 +91,7 @@ public class EnemyController : MonoBehaviour
                 _destination = _playerPosition;
             }
             yield return new WaitForSeconds(1f);
+            _isCoroutine = false;
         }
     }
 
@@ -122,6 +131,7 @@ public class EnemyController : MonoBehaviour
 
     IEnumerator DamagePlayer()
     {
+
         // Gizmos와 동일한 위치 적용!
         Vector3 worldCenter = transform.TransformPoint(_skillQCenter);
 
@@ -163,9 +173,12 @@ public class EnemyController : MonoBehaviour
         {
             ShooterController._instance.OnShooterPositionChanged += UpdatePlayerPosition;
         }
-
-        StartCoroutine(MoveToTarget());
-        StartCoroutine(AttackPlayer());
+        if (!_isCoroutine)
+        {
+            _isCoroutine = true;
+            StartCoroutine(MoveToTarget());
+            StartCoroutine(AttackPlayer());
+        }
     }
 
     public float GetHealthPercentage()
