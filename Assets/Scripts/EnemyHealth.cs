@@ -25,6 +25,8 @@ public class EnemyHealth : MonoBehaviour
 
     void Die()
     {
+        GameManager._instance.AddScore(1);
+
         EnemyController enemyController = GetComponent<EnemyController>();
         if (enemyController != null)
         {

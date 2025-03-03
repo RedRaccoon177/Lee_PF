@@ -52,4 +52,9 @@ public class ShooterAnimationManager : MonoBehaviour
     {
         _animator.SetTrigger(skillName); // 특정 스킬 애니메이션 트리거 실행
     }
+
+    public void PlayDeathAnimation()
+    {
+        _animator.SetTrigger("IsDeath");
+    }
 }

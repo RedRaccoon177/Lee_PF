@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.XR;
 using UnityEngine.UI;
@@ -77,6 +78,9 @@ public class ShooterController : MonoBehaviour
     [SerializeField] private float _reloadTime = 2f; // 장전 시간
     public bool _isReloading = false; // 장전 중인지 체크
 
+    SoundManager soundManager;
+
+
     void Awake()
     {
         if (_instance == null) _instance = this;
@@ -107,6 +111,8 @@ public class ShooterController : MonoBehaviour
         _currentReserveAmmo = _startAmmo; // 예비 총알 지정
 
         UpdateAmmoUI(); // 초기 UI 설정
+
+        soundManager = FindObjectOfType<SoundManager>();
     }
 
     void OnDrawGizmos()
@@ -239,8 +245,6 @@ public class ShooterController : MonoBehaviour
         Vector3 moveDirection = ConvertInputToWorldDirection(moveInput);
         Vector3 forwardDirection = transform.forward; // 캐릭터가 바라보는 방향
 
-        //Debug.Log(moveDirection + ", " + forwardDirection);
-
         // 이동 방향과 캐릭터 바라보는 방향 간의 상대 각도를 계산
         float angle = Vector3.SignedAngle(forwardDirection, moveDirection, Vector3.up);
 
@@ -266,8 +270,14 @@ public class ShooterController : MonoBehaviour
 
     void OnShoot(InputAction.CallbackContext ctx)
     {
+        if (EventSystem.current.IsPointerOverGameObject())
+        {
+            return;
+        }
+
         if (_currentAmmoInMagazine > 0 && !_isReloading) // 탄창에 총알이 있으면 발사 가능
         {
+            soundManager.PlayShootSound();
             _currentAmmoInMagazine--; // 한 발 소비
             _shooterShootCommand.Execute();
             UpdateAmmoUI(); // 총기 발사 후 UI 갱신
@@ -290,7 +300,7 @@ public class ShooterController : MonoBehaviour
     void OnReload(InputAction.CallbackContext ctx)
     {
         //_shooterReloadCommand.Execute();
-
+        soundManager.PlayReloadSound();
         if (_currentReserveAmmo <= 0 || _isReloading) return;
         _isReloading = true;
         _shooterAnimationManager.PlayReload(_isReloading);
@@ -312,7 +322,6 @@ public class ShooterController : MonoBehaviour
         _isReloading = false;
         _shooterAnimationManager.PlayReload(_isReloading);
     }
-
 
     public void AddAmmo(int amount) // 총알 획득 시 호출
     {
@@ -365,10 +374,10 @@ public class ShooterController : MonoBehaviour
         }
         Debug.Log(_currentHealth);
     }
+
     void Die()
     {
-        Debug.Log("플레이어 사망!");
-        //TODO: 사망 애니메이션 & 게임 오버 처리
+        _shooterAnimationManager.PlayDeathAnimation();
+        GameManager._instance.GameOver();
     }
-
 }

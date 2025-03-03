@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.17276807, g: 0.21589197, b: 0.29782572, a: 1}
+  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -491,6 +491,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SM_Chr_BR_EVA_Suit_01
       objectReference: {fileID: 0}
+    - target: {fileID: 4179041488514582260, guid: f1031d795ab6d2d409915e89bab215ab, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -526,7 +530,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 120
   currentHealth: 0
-  deathEffect: {fileID: 0}
 --- !u!1 &710856230 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1850214413365240938, guid: f1d2bb09933486c41815512f63380367, type: 3}
@@ -546,7 +549,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 120
   currentHealth: 0
-  deathEffect: {fileID: 0}
 --- !u!1 &725094944
 GameObject:
   m_ObjectHideFlags: 0
@@ -1653,7 +1655,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   maxHealth: 100
   currentHealth: 0
-  deathEffect: {fileID: 0}
 --- !u!1 &1595484305737993 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3412552292723171796, guid: c75648d966b82874097f3d9e416f7677, type: 3}

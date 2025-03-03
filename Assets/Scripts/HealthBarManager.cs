@@ -111,7 +111,7 @@ public class HealthBarManager : MonoBehaviour
 
         RectTransform healthBar = healthBars[enemy];
 
-        // 월드 좌표 → 스크린 좌표 변환
+        // 월드 좌표 => 스크린 좌표 변환
         Vector3 screenPos = Camera.main.WorldToScreenPoint(enemy.transform.position + Vector3.up * 4f);
 
         // 체력 확인 (체력이 0이면 숨김)
