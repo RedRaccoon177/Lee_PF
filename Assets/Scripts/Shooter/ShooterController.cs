@@ -229,7 +229,7 @@ public class ShooterController : MonoBehaviour
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 10f);
         }
     }
-
+    
     Vector3 ConvertInputToWorldDirection(Vector3 inputDirection)
     {
         return new Vector3(inputDirection.x, 0, inputDirection.z).normalized;
