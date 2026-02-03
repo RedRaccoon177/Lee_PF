@@ -22,7 +22,7 @@
 
 <br>
 
-<!-- ===== SCREENSHOTS (2x2) ===== -->
+<!-- ===== SCREENSHOTS (2 images) ===== -->
 <table align="center">
   <tr>
     <td width="50%">
@@ -36,12 +36,12 @@
 
 <br>
 
-## 프로젝트 정보
+## 📌 프로젝트 정보
 - 개발 인원: **1명**
 - 제작 기간: **2025.02.19 ~ 2025.03.03 (9일)**
 - 장르: **쿼터뷰 슈터 / 전투 프로토타입**
 - 엔진: **Unity 3D (2022.3.21f1)**
-- 본 README는 포트폴리오 용도로 **애니메이션 시스템(Animator/BlendTree/Layer) 중심**으로 정리했습니다.
+- 본 README는 포트폴리오 용도로 **핵심 기술 + 구현 시스템(코드)** 중심으로 정리했습니다.
 
 <br>
 
@@ -49,24 +49,28 @@
 
 <br>
 
-## 목차
-- [게임 소개](#game-intro)
-- [핵심 기술](#key-tech)
-  - [8방향 Blend Tree 로코모션(Walk/Run)](#anim-8dir)
-  - [상체 레이어 분리(사격/재장전)](#upperbody)
-  - [Death 처리(Any State 진입)](#death)
-  - [파라미터 설계 요약](#param-summary)
-- [구현 시스템 (코드 기준)](#what-i-built)
-  - [플레이어(입력/이동/조준/애니메이션)](#player-system)
-  - [전투(사격/재장전/피격)](#combat-system)
-  - [적 AI/체력/사망](#enemy-system)
-  - [오브젝트 풀링(VFX/Enemy)](#pool-system)
+## 📚 목차
+- [🎯 게임 소개](#game-intro)
+- [🧠 핵심 기술](#key-tech)
+  - [1) 8방향 Blend Tree 로코모션(Walk/Run)](#anim-8dir)
+  - [2) 상체 레이어 분리(사격/재장전)](#upperbody)
+  - [3) Animator 파라미터 스무딩(방향 보간)](#anim-smoothing)
+  - [4) 커맨드 패턴 기반 전투 입력 분리](#command-pattern)
+  - [5) Object Pool 기반 VFX/Enemy 풀링](#object-pooling)
+  - [6) Input System 이벤트 기반 입력 처리](#input-system)
+  - [7) Death 전환(Any State)](#death)
+  - [8) Animator 파라미터 요약](#param-summary)
+- [✅ 구현 시스템 (코드 기준)](#what-i-built)
+  - [플레이어](#player-system)
+  - [전투](#combat-system)
+  - [적](#enemy-system)
+  - [풀링](#pool-system)
   - [UI/게임 흐름](#ui-flow)
   - [사운드](#sound-system)
   - [카메라](#camera-system)
   - [씬 로딩](#scene-system)
-- [기술 스택](#tech-stack)
-- [개발자 소개](#developer)
+- [🛠️ 기술 스택](#tech-stack)
+- [👨‍💻 개발자 소개](#developer)
 
 <br>
 
@@ -76,11 +80,8 @@
 
 <a name="game-intro"></a>
 ## 🎯 게임 소개
-Lee_PF는 플레이어가 이동/조준/사격/재장전을 수행하고, 적이 추적/공격하는 기본 전투 루프를 갖춘 **쿼터뷰 슈터 프로토타입**입니다.
-
-이 프로젝트에서 가장 강조하는 포인트는,
-**"조작감에 직접 연결되는 애니메이션 품질"**을 목표로 한  
-**8방향 이동(걷기/달리기) Blend Tree 설계 + 상체 레이어 분리 구조**입니다.
+Lee_PF는 플레이어가 **이동/조준/사격/재장전**을 수행하고, 적이 **추적/공격/피격/사망**하는 기본 전투 루프를 갖춘 **쿼터뷰 슈터 프로토타입**입니다.  
+조작감에 직접 영향을 주는 요소(이동 로코모션, 전투 동작, 입력 처리, 전투 VFX 성능)를 중심으로 시스템을 구성했습니다.
 
 <br>
 
@@ -92,23 +93,14 @@ Lee_PF는 플레이어가 이동/조준/사격/재장전을 수행하고, 적이
 ## 🧠 핵심 기술
 
 <a name="anim-8dir"></a>
-### 1) Blend Tree 기반 8방향 로코모션 (Walk/Run)
-플레이어 로코모션은 `MoveSpeed(속도)`와 `DirectionX/Y(방향)`를 분리해,
-**속도 전환(Idle/Walk/Run)**과 **방향 전환(8방향)**이 서로 꼬이지 않도록 구성했습니다.
+### 1) 8방향 Blend Tree 로코모션(Walk/Run)
+플레이어 로코모션은 `MoveSpeed`(속도)와 `DirectionX/Y`(방향)를 분리해, 속도 변화와 방향 변화가 서로 충돌하지 않도록 구성했습니다.  
+`MoveBlendTree` 내부에서 Walk/Run을 분리한 뒤, 각 상태에서 8방향을 2D Blend Tree로 보간하도록 설계했습니다.
 
-#### (1) 로코모션 트리 구조
-- `MoveBlendTree` 내부에서 **WalkBlend / RunBlend를 분리**해 구성
-- Walk/Run 모두 동일한 좌표 체계로 8방향을 구성하여,
-  **걷기 -> 달리기 전환 중에도 방향이 깨지지 않도록** 설계
+- WalkBlend / RunBlend 타입: **2D Simple Directional**
+- 사용 파라미터: `DirectionX`, `DirectionY`
 
-#### (2) WalkBlend / RunBlend Blend Type (팩트)
-- `WalkBlend` : **2D Simple Directional**
-- `RunBlend` : **2D Simple Directional**
-- 파라미터: `DirectionX`, `DirectionY`
-
-#### (3) 8방향 Threshold 매핑 (팩트)
-WalkBlend / RunBlend 모두 다음 좌표로 8방향 클립을 배치했습니다.
-
+8방향 Threshold 좌표는 아래처럼 구성했습니다.
 - Forward: (0, 1)
 - Forward Right: (0.7, 0.7)
 - Right: (1, 0)
@@ -118,68 +110,79 @@ WalkBlend / RunBlend 모두 다음 좌표로 8방향 클립을 배치했습니�
 - Left: (-1, 0)
 - Forward Left: (-0.7, 0.7)
 
-#### (4) 설계 의도(포트폴리오 포인트)
-- **방향 전환이 "클립 스왑"이 아니라 "보간"으로 자연스럽게 이어지도록**
-  - 2D Blend Tree에서 입력 벡터가 이동할수록 주변 클립이 가중치로 섞여, 급격한 끊김을 줄임
-- **Walk/Run을 같은 입력 축(DirectionX/Y)로 유지**
-  - 속도만 달라지고 방향 축은 동일하므로, 이동 조작감이 일관됨
-- **8방향 클립 구성(대각 포함)으로 조작성 강화**
-  - 쿼터뷰에서 체감이 큰 "대각 입력"을 끊김 없이 처리
+이 구조 덕분에 대각 이동에서도 클립이 자연스럽게 섞여 이어지고, Walk에서 Run으로 전환될 때도 같은 방향 축을 공유해서 이동 감각이 안정적으로 유지됩니다.
 
 <br>
 
 <a name="upperbody"></a>
-### 2) 상체 레이어 분리 (사격/재장전이 이동을 깨지 않게)
-로코모션(하체)과 전투 동작(상체)을 분리하기 위해,
-`Base Layer`와 별도의 `UpBody Layer`를 구성했습니다.
+### 2) 상체 레이어 분리(사격/재장전)
+로코모션(하체)과 전투 동작(상체)을 분리하기 위해 `UpBody Layer`를 별도로 구성했습니다.  
+이동 로코모션은 유지한 채, 사격/재장전 동작만 상체 레이어에서 처리하도록 설계했습니다.
 
-- `UpBody Layer` 상태 구성(팩트)
+- UpBody Layer 상태 흐름:
   - `Entry -> MoveBlendTree`
   - `MoveBlendTree <-> Firing`
   - `MoveBlendTree <-> Reloading`
 
-#### (1) 왜 레이어를 분리했는가?
-- 이동 중 사격/재장전을 구현할 때,
-  로코모션 전체를 Firing/Reloading으로 갈아끼우면 **이동이 끊기거나 전환이 부자연스러워질 가능성**이 큼
-- 상체 레이어로 분리하면,
-  **하체 로코모션은 유지**하면서 **상체만 전투 동작으로 전환** 가능
+전투 도중에도 하체 로코모션이 끊기지 않고, 전투 동작이 끝나면 MoveBlendTree로 자연스럽게 복귀하도록 구성했습니다.
 
-#### (2) 전환 구조의 장점
-- 이동 상태를 유지하면서 사격/재장전을 수행하므로,
-  **전투 중 조작감(입력 반응성)이 유지**됨
-- Firing/Reloading이 끝나면 MoveBlendTree로 복귀하는 왕복 구조라,
-  상태 폭발을 줄이고 유지보수를 단순화함
+<br>
+
+<a name="anim-smoothing"></a>
+### 3) Animator 파라미터 스무딩(방향 보간)
+8방향 블렌딩은 입력이 급격하게 변하면 애니메이션이 덜컥거릴 수 있어서, 방향 파라미터는 보간으로 안정화했습니다.  
+`ShooterAnimationManager.cs`에서 `DirectionX/Y`를 `Mathf.Lerp` 기반으로 부드럽게 따라가게 만들어 방향 전환이 매끄럽게 이어지도록 구성했습니다.
+
+<br>
+
+<a name="command-pattern"></a>
+### 4) 커맨드 패턴 기반 전투 입력 분리
+전투 입력은 입력 처리와 실제 실행 로직이 섞이기 쉬워서, 커맨드 패턴으로 역할을 분리했습니다.
+
+- `ShooterAllCommand.cs`
+  - `ShooterICommand` 인터페이스(`Execute()`)
+  - `ShooterShootCommand` / `ShooterReloadCommand`
+
+사격은 “입력 감지”와 “사격 실행(이펙트/트레일/애니메이션 트리거)”을 분리해 호출하는 형태로 구성했습니다.  
+이 구조는 무기/공격 방식이 늘어나도 입력 처리 코드가 비대해지지 않도록 확장 방향을 잡아줍니다.
+
+<br>
+
+<a name="object-pooling"></a>
+### 5) Object Pool 기반 VFX/Enemy 풀링
+전투에서 자주 생성되는 VFX(총구 화염, 탄도 트레일, 피격/사망 파티클)와 Enemy는 풀링으로 재사용하도록 구성했습니다.
+
+- `ObjectPoolManager.cs`
+  - Enemy 풀 + 파티클 풀을 구성해 스폰/반환 루틴을 통일
+
+Instantiate/Destroy 반복을 줄여 전투 상황에서도 프레임이 흔들리지 않도록 설계했습니다.
+
+<br>
+
+<a name="input-system"></a>
+### 6) Input System 이벤트 기반 입력 처리
+Unity Input System을 사용해 입력을 이벤트 콜백으로 분리했습니다.
+
+- `ShooterController.cs`
+  - `PlayerInput`, `InputAction` 기반
+  - 콜백: `OnMove`, `OnRun`, `OnShoot`, `OnReload`
+
+조준은 `Ray + Plane.Raycast`로 바닥 평면 교차점을 구해 타겟을 계산하는 방식으로 구성했습니다.
 
 <br>
 
 <a name="death"></a>
-### 3) Death 처리 (Any State 진입)
-사망은 특정 상태에서만 진입하는 방식이 아니라,
-**Any State에서 바로 Death로 진입**하도록 구성했습니다.
-
-- `Base Layer`에서 `Any State -> Knife_St_Death_B` 전환(팩트)
-
-#### 의도
-- 전투 중 어떤 타이밍(이동/사격/재장전/기타)에서도
-  **사망 전환이 누락되지 않도록** 보장하는 구조
+### 7) Death 전환(Any State)
+사망은 특정 상태에서만 진입하도록 제한하지 않고, 어떤 상황에서도 즉시 전환될 수 있게 `Any State -> Death` 전환으로 구성했습니다.  
+이동 중이든, 사격/재장전 중이든 체력이 0이 되는 순간 사망 상태로 확실히 들어가도록 해 전투 흐름이 어색하게 남지 않게 했습니다.
 
 <br>
 
 <a name="param-summary"></a>
-### 4) 파라미터 설계 요약 (팩트)
-Animator 파라미터는 다음과 같이 구성했습니다.
-
-- Float
-  - `MoveSpeed`
-  - `DirectionX`
-  - `DirectionY`
-- Bool
-  - `IsIdle`
-  - `IsReload`
-- Trigger
-  - `IsShooting`
-  - `IsSkillQ`
-  - `IsDeath`
+### 8) Animator 파라미터 요약
+- Float: `MoveSpeed`, `DirectionX`, `DirectionY`
+- Bool: `IsIdle`, `IsReload`
+- Trigger: `IsShooting`, `IsSkillQ`, `IsDeath`
 
 <br>
 
@@ -189,74 +192,58 @@ Animator 파라미터는 다음과 같이 구성했습니다.
 
 <a name="what-i-built"></a>
 ## ✅ 구현 시스템 (코드 기준)
-아래는 프로젝트에서 사용한 스크립트를 **역할 단위로 정리**한 목록입니다.
 
 <a name="player-system"></a>
-### 1) 플레이어(입력/이동/조준/애니메이션)
-- `ShooterController.cs`
-  - 플레이어 입력/이동/조준 및 전투 입력 트리거 처리
-- `ShooterAnimationManager.cs`
-  - Animator 파라미터 갱신(로코모션/전투 상태 연동)
-- `ShooterHealth.cs`
-  - 플레이어 체력/피격/사망 처리
+### 1) 플레이어
+- `ShooterController.cs`: 이동/달리기/사격/재장전 입력 처리, 조준 타겟 계산
+- `ShooterAnimationManager.cs`: MoveSpeed/DirectionX/Y 갱신 및 방향 보간
+- `ShooterHealth.cs`: 플레이어 체력/피격/사망 처리
 
 <br>
 
 <a name="combat-system"></a>
-### 2) 전투(사격/재장전/피격)
-- `ShooterAllCommand.cs`
-  - 사격/재장전 등 행동을 커맨드 형태로 분리해 호출하는 구조
-- `ObjectPoolManager.cs`
-  - 총구 화염/탄도 트레일/피격 파티클 등 전투 VFX를 풀링/재사용
+### 2) 전투
+- `ShooterAllCommand.cs`: 커맨드 패턴 기반 사격/재장전 실행 분리
+- `ObjectPoolManager.cs`: 사격 VFX(총구 화염/트레일/피격) 풀링 및 스폰
 
 <br>
 
 <a name="enemy-system"></a>
-### 3) 적 AI/체력/사망
-- `EnemyController.cs`
-  - 적 이동/추적/공격 등 행동 제어
-- `EnemyHealth.cs`
-  - 적 피격/사망 처리 및 점수/이펙트 연동
+### 3) 적
+- `EnemyController.cs`: 적 행동 제어(추적/공격 등)
+- `EnemyHealth.cs`: 적 피격/사망 처리 및 연동
 
 <br>
 
 <a name="pool-system"></a>
-### 4) 오브젝트 풀링(VFX/Enemy)
-- `ObjectPoolManager.cs`
-  - Enemy 및 전투 이펙트(Particle/Trail 등) 재사용 풀링
-  - 전투 중 Instantiate/Destroy 비용을 줄이기 위한 구조
+### 4) 풀링
+- `ObjectPoolManager.cs`: Enemy/VFX 풀 관리 및 반환 처리
 
 <br>
 
 <a name="ui-flow"></a>
 ### 5) UI/게임 흐름
-- `GameManager.cs`
-  - 게임 진행(점수/시간/상태) 및 게임 오버 등 흐름 관리
-- `HealthBarManager.cs`
-  - 체력바 UI 갱신/표시 관련 관리
-- `UIButtonSound.cs`
-  - UI 상호작용에 대한 버튼 사운드 처리
+- `GameManager.cs`: 게임 진행/상태 관리
+- `HealthBarManager.cs`: 체력 UI 갱신
+- `UIButtonSound.cs`: UI 상호작용 사운드
 
 <br>
 
 <a name="sound-system"></a>
 ### 6) 사운드
-- `SoundManager.cs`
-  - 사격/피격/버튼 등 효과음 관리
+- `SoundManager.cs`: 효과음 관리(사격/피격/버튼 등)
 
 <br>
 
 <a name="camera-system"></a>
 ### 7) 카메라
-- `CameraRPGPerspective.cs`
-  - 쿼터뷰/탑뷰 형태의 카메라 시점 유지 및 타겟 추적
+- `CameraRPGPerspective.cs`: 쿼터뷰 카메라 시점 유지 및 타겟 추적
 
 <br>
 
 <a name="scene-system"></a>
 ### 8) 씬 로딩
-- `SceneManager.cs`
-  - 씬 전환/로드 관련 래퍼(프로젝트 내 씬 흐름 제어)
+- `SceneManager.cs`: 씬 전환/로드 흐름 제어
 
 <br>
 
@@ -268,8 +255,10 @@ Animator 파라미터는 다음과 같이 구성했습니다.
 ## 🛠️ 기술 스택
 - 엔진: Unity 3D (2022.3.21f1)
 - 언어: C#
-- 애니메이션: Animator Controller, Blend Tree (2D Simple Directional), Layer 분리(UpBody), Any State Transition
-- (프로젝트 구성에 따라 추가 가능): Object Pooling, NavMesh/AI, UI(TMP 등)
+- 입력: Unity Input System (PlayerInput, InputAction)
+- 애니메이션: Animator Controller, Blend Tree(2D Simple Directional), Layer(UpBody), Any State Transition
+- 설계 패턴: 커맨드 패턴(Command Pattern)
+- 최적화: Object Pool(Unity ObjectPool) 기반 풀링
 
 <br>
 
@@ -283,5 +272,4 @@ Animator 파라미터는 다음과 같이 구성했습니다.
 - Tistory: [https://wearelast99.tistory.com/]
 - YouTube: [유튜브 채널](https://www.youtube.com/@%EC%9D%B4%EC%9C%A0-z9c)
 - Canva 포트폴리오: [포트폴리오](https://www.canva.com/design/DAGusJR6Rj8/BOtICI6F1raShPyHHewjxg/view?utm_content=DAGusJR6Rj8&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h691958bd9a)
-- Canva 이력서: [이력서](https://www.canva.com/design/DAGusJR6Rj8/YPk_CLe8B1taKTE-nneUJA/view?utm_content=DAGj7YKBoc8&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=ha914d97458)
-
+- Canva 이력서: [이력서](https://www.canva.com/design/DAGj7YKBoc8/YPk_CLe8B1taKTE-nneUJA/view?utm_content=DAGj7YKBoc8&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=ha914d97458)
